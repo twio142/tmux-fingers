@@ -27,6 +27,13 @@ define_style_option :selected_hint, Tmux.style_printer.print("fg=blue,bold")
 define_style_option :selected_highlight, Tmux.style_printer.print("fg=blue")
 define_style_option :backdrop, ""
 
+# Empty means "follow the regular style", resolved at render time so that
+# customising the regular one keeps both in step.
+define_style_option :hyperlink_hint, ""
+define_style_option :hyperlink_highlight, ""
+define_style_option :hyperlink_selected_hint, ""
+define_style_option :hyperlink_selected_highlight, ""
+
 define_string_option :tmux_version, ""
 
 define_fingers_macros

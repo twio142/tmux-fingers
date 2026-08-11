@@ -90,6 +90,10 @@ NOTE: for changes to take effect, you'll need to source again your `.tmux.conf` 
 * [@fingers-backdrop-style](#fingers-backdrop-style)
 * [@fingers-selected-hint-style](#fingers-selected-hint-style)
 * [@fingers-selected-highlight-style](#fingers-selected-highlight-style)
+* [@fingers-hyperlink-hint-style](#fingers-hyperlink-hint-style)
+* [@fingers-hyperlink-highlight-style](#fingers-hyperlink-highlight-style)
+* [@fingers-hyperlink-selected-hint-style](#fingers-hyperlink-selected-hint-style)
+* [@fingers-hyperlink-selected-highlight-style](#fingers-hyperlink-selected-highlight-style)
 * [@fingers-hint-position](#fingers-hint-position)
 * [@fingers-keyboard-layout](#fingers-keyboard-layout)
 * [@fingers-show-copied-notification](#fingers-show-copied-notification)
@@ -224,6 +228,19 @@ Format for hints in selected matches in multimode.
 `default: "fg=blue"`
 
 Format for selected matches in multimode.
+
+## @fingers-hyperlink-hint-style
+## @fingers-hyperlink-highlight-style
+## @fingers-hyperlink-selected-hint-style
+## @fingers-hyperlink-selected-highlight-style
+
+`default: unset, follows the regular style`
+
+Separate styles for [hyperlink](#fingers-hyperlinks) hints, so they can be told
+apart from pattern matches.
+
+Each one falls back to its regular counterpart while unset.
+Same syntax as [@fingers-hint-style](#fingers-hint-style).
 
 ## @fingers-hint-position
 

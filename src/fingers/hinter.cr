@@ -27,8 +27,9 @@ module Fingers
       property text : String
       property captured_text : String
       property capture_offset : Tuple(Int32, Int32) | Nil
+      property? hyperlink : Bool
 
-      def initialize(@start, @text, @captured_text, @capture_offset)
+      def initialize(@start, @text, @captured_text, @capture_offset, @hyperlink = false)
       end
 
       def size
@@ -44,6 +45,7 @@ module Fingers
     end
 
     @formatter : Formatter
+    @hyperlink_formatter : Formatter
     @patterns : Array(String)
     @alphabet : Array(String)
     @pattern : Regex | Nil
@@ -61,6 +63,7 @@ module Fingers
       alphabet = Fingers.config.alphabet,
       huffman = Huffman.new,
       formatter = ::Fingers::MatchFormatter.new,
+      hyperlink_formatter = ::Fingers::MatchFormatter.for_hyperlinks,
       reuse_hints = false,
       hyperlinks = [] of Array(HyperlinkSpan)
     )
@@ -71,6 +74,7 @@ module Fingers
       @state = state
       @output = output
       @formatter = formatter
+      @hyperlink_formatter = hyperlink_formatter
       @huffman = huffman
       @patterns = patterns
       @alphabet = alphabet
@@ -100,6 +104,7 @@ module Fingers
       :width,
       :state,
       :formatter,
+      :hyperlink_formatter,
       :huffman,
       :output,
       :patterns,
@@ -185,6 +190,7 @@ module Fingers
           text: line[span.start, span.size],
           captured_text: span.url,
           capture_offset: nil,
+          hyperlink: true,
         )
       end
 
@@ -250,12 +256,16 @@ module Fingers
         return text
       end
 
-      formatter.format(
+      formatter_for(candidate).format(
         hint: hint,
         highlight: text,
         selected: state.selected_hints.includes?(hint),
         offset: relative_capture_offset
       )
+    end
+
+    private def formatter_for(candidate : Candidate) : Formatter
+      candidate.hyperlink? ? hyperlink_formatter : formatter
     end
 
     def captured_text_for_match(match)

@@ -227,6 +227,35 @@ Changes not staged for commit:
     targets_of(hinter, every_hint).should be_empty
   end
 
+  it "styles hyperlinks with the hyperlink formatter" do
+    output = TextOutput.new
+
+    hinter = Fingers::Hinter.new(
+      input: ["0xFF and an anchor"],
+      width: 100,
+      patterns: [Fingers::BUILTIN_PATTERNS["hex"]],
+      state: ::Fingers::State.new,
+      alphabet: "asdf".split(""),
+      output: output,
+      formatter: ::Fingers::MatchFormatter.new(
+        hint_style: "<PATTERN-HINT>",
+        highlight_style: "<PATTERN-HL>",
+      ),
+      hyperlink_formatter: ::Fingers::MatchFormatter.new(
+        hint_style: "<LINK-HINT>",
+        highlight_style: "<LINK-HL>",
+      ),
+      hyperlinks: [[Fingers::HyperlinkSpan.new(12, 6, "https://example.com")]],
+    )
+
+    hinter.run
+
+    output.contents.should contain("<PATTERN-HINT>")
+    output.contents.should contain("<LINK-HINT>")
+    # the hint over the anchor is the hyperlink one, not the pattern one
+    output.contents.index("<LINK-HINT>").not_nil!.should be > output.contents.index("<PATTERN-HINT>").not_nil!
+  end
+
   it "renders the anchor rather than the url" do
     output = TextOutput.new
 
