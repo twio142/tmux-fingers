@@ -10,6 +10,7 @@ define_bool_option :enable_bindings, true
 define_bool_option :benchmark_mode, false
 define_bool_option :show_copied_notification, true
 define_bool_option :skip_wizard, false
+define_bool_option :hyperlinks, true
 
 define_enum_option :hint_position, %w(left right), "left"
 define_enum_option :keyboard_layout, Fingers::ALPHABET_MAP.keys, "qwerty"
