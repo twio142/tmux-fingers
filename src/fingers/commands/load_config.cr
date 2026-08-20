@@ -10,6 +10,7 @@ require "colorize"
 
 class Fingers::Commands::LoadConfig < Cling::Command
   @fingers_options_names : Array(String) | Nil
+  @shell_safe_options : Hash(String, String) | Nil
 
   property config : Fingers::Config = Fingers::Config.new
 
@@ -64,50 +65,73 @@ class Fingers::Commands::LoadConfig < Cling::Command
   end
 
   def setup_bindings
-    setup_root_bindings if Fingers.config.enable_bindings
-    setup_fingers_mode_bindings
-    `tmux set-option -g @fingers-cli #{cli}`
+    commands = [] of String
+
+    setup_root_bindings(commands) if Fingers.config.enable_bindings
+    setup_fingers_mode_bindings(commands)
+    commands << %(set-option -g @fingers-cli "#{cli}")
+
+    apply_tmux_commands(commands)
   end
 
-  def setup_root_bindings
-    `tmux bind-key #{Fingers.config.key} run-shell -b "#{cli} start "\#{pane_id}" >>#{Fingers::Dirs::LOG_PATH} 2>&1"`
-    `tmux bind-key #{Fingers.config.jump_key} run-shell -b "#{cli} start --mode jump "\#{pane_id}" >>#{Fingers::Dirs::LOG_PATH} 2>&1"`
+  # Handing these to tmux one `tmux bind-key` at a time costs a client/server
+  # round trip per binding, and there are ~94 of them — close to a second on
+  # every tmux server start. Write them out as a config file instead and let
+  # tmux apply the lot in a single call.
+  def apply_tmux_commands(commands)
+    path = File.tempname("fingers-bindings", ".tmux")
+
+    begin
+      File.write(path, commands.join("\n") + "\n")
+      `tmux source-file '#{path}'`
+    ensure
+      File.delete?(path)
+    end
   end
 
-  def setup_fingers_mode_bindings
+  def setup_root_bindings(commands)
+    commands << %(bind-key #{Fingers.config.key} run-shell -b "#{cli} start \#{pane_id} >>#{Fingers::Dirs::LOG_PATH} 2>&1")
+    commands << %(bind-key #{Fingers.config.jump_key} run-shell -b "#{cli} start --mode jump \#{pane_id} >>#{Fingers::Dirs::LOG_PATH} 2>&1")
+  end
+
+  def setup_fingers_mode_bindings(commands)
     ("a".."z").to_a.each do |char|
       next if char.match(DISALLOWED_CHARS)
 
-      fingers_mode_bind(char, "hint:#{char}:main")
-      fingers_mode_bind(char.upcase, "hint:#{char}:shift")
-      fingers_mode_bind("C-#{char}", "hint:#{char}:ctrl")
-      fingers_mode_bind("M-#{char}", "hint:#{char}:alt")
+      fingers_mode_bind(commands, char, "hint:#{char}:main")
+      fingers_mode_bind(commands, char.upcase, "hint:#{char}:shift")
+      fingers_mode_bind(commands, "C-#{char}", "hint:#{char}:ctrl")
+      fingers_mode_bind(commands, "M-#{char}", "hint:#{char}:alt")
     end
 
-    fingers_mode_bind("Space", "fzf")
-    fingers_mode_bind("C-c", "exit")
-    fingers_mode_bind("q", "exit")
-    fingers_mode_bind("Escape", "exit")
+    fingers_mode_bind(commands, "Space", "fzf")
+    fingers_mode_bind(commands, "C-c", "exit")
+    fingers_mode_bind(commands, "q", "exit")
+    fingers_mode_bind(commands, "Escape", "exit")
 
-    fingers_mode_bind("?", "toggle-help")
+    fingers_mode_bind(commands, "?", "toggle-help")
 
-    fingers_mode_bind("Enter", "noop")
-    fingers_mode_bind("Tab", "toggle-multi-mode")
+    fingers_mode_bind(commands, "Enter", "noop")
+    fingers_mode_bind(commands, "Tab", "toggle-multi-mode")
 
-    fingers_mode_bind("Any", "noop")
+    fingers_mode_bind(commands, "Any", "noop")
   end
 
+  # Called by both validate_options! and parse_tmux_conf, and every entry costs
+  # a `tmux show-option` round trip, so read the options once and keep them.
   def shell_safe_options
-    options = {} of String => String
+    @shell_safe_options ||= begin
+      options = {} of String => String
 
-    fingers_options_names.each do |tmux_option|
-      option = from_tmux_option(tmux_option)
-      next if PRIVATE_OPTIONS.includes?(option)
+      fingers_options_names.each do |tmux_option|
+        option = from_tmux_option(tmux_option)
+        next if PRIVATE_OPTIONS.includes?(option)
 
-      options[option] = `tmux show-option -gv #{tmux_option}`.chomp
+        options[option] = `tmux show-option -gv #{tmux_option}`.chomp
+      end
+
+      options
     end
-
-    options
   end
 
   def fingers_options_names
@@ -143,8 +167,8 @@ class Fingers::Commands::LoadConfig < Cling::Command
     "@fingers-#{value.to_s.tr("_", "-")}"
   end
 
-  def fingers_mode_bind(key, command)
-    `tmux bind-key -Tfingers "#{key}" run-shell -b "#{cli} send-input #{command}"`
+  def fingers_mode_bind(commands, key, command)
+    commands << %(bind-key -Tfingers "#{key}" run-shell -b "#{cli} send-input #{command}")
   end
 
   def cli
