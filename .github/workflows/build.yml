@@ -1,0 +1,79 @@
+name: Build binaries
+
+# Manual builds, for grabbing a binary without cutting a release.
+# The build recipes mirror deployment.yml, so the artifacts here are the same
+# thing the release workflow would upload: fully static on Linux, and on macOS
+# linked against static libgc/libpcre2 so the binary does not need Homebrew.
+#
+# Note: artifacts are delivered as zips and GitHub does not preserve the
+# executable bit, so `chmod +x tmux-fingers` after unzipping.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build (blank = the ref this run was started from)
+        required: false
+        type: string
+
+jobs:
+  linux:
+    name: linux-${{ matrix.suffix }}
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: crystallang/crystal:1.19-alpine
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            suffix: x86_64
+          - runner: ubuntu-24.04-arm
+            suffix: arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Update libs
+        run: apk add --update --upgrade --no-cache --force-overwrite libxml2-dev yaml-dev yaml-static
+      - name: Build
+        run: shards build --production --release --static --no-debug
+        env:
+          WIZARD_INSTALLATION_METHOD: download-binary
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmux-fingers-linux-${{ matrix.suffix }}
+          path: bin/tmux-fingers
+          if-no-files-found: error
+
+  macos:
+    name: macos-arm64
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: "1.19"
+      - name: Install static lib dependencies
+        run: brew install bdw-gc pcre2
+      - name: Prepare static libs
+        run: |
+          mkdir -p bin
+          ln -sf $(brew --prefix bdw-gc)/lib/libgc.a bin/libgc.a
+          ln -sf $(brew --prefix pcre2)/lib/libpcre2-8.a bin/libpcre2-8.a
+      - name: Build
+        run: |
+          shards build --production --release --no-debug \
+            --link-flags="-L $(pwd)/bin $(pwd)/bin/libgc.a $(pwd)/bin/libpcre2-8.a"
+        env:
+          WIZARD_INSTALLATION_METHOD: download-binary
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmux-fingers-macos-arm64
+          path: bin/tmux-fingers
+          if-no-files-found: error
