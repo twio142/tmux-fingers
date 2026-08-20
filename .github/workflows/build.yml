@@ -20,8 +20,6 @@ jobs:
   linux:
     name: linux-${{ matrix.suffix }}
     runs-on: ${{ matrix.runner }}
-    container:
-      image: crystallang/crystal:1.19-alpine
     strategy:
       fail-fast: false
       matrix:
@@ -34,12 +32,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
-      - name: Update libs
-        run: apk add --update --upgrade --no-cache --force-overwrite libxml2-dev yaml-dev yaml-static
+      # The build runs in the Alpine image (musl, for the static link), but as a
+      # plain `docker run` rather than a job `container:`. GitHub only supports
+      # JavaScript actions inside Alpine containers on x64, so checkout and
+      # upload have to stay on the host for the arm64 runner to work.
       - name: Build
-        run: shards build --production --release --static --no-debug
-        env:
-          WIZARD_INSTALLATION_METHOD: download-binary
+        run: |
+          docker run --rm \
+            -v "$PWD":/app -w /app \
+            -e WIZARD_INSTALLATION_METHOD=download-binary \
+            crystallang/crystal:1.19-alpine \
+            sh -c 'apk add --update --upgrade --no-cache --force-overwrite libxml2-dev yaml-dev yaml-static &&
+                   shards build --production --release --static --no-debug'
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
