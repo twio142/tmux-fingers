@@ -4,9 +4,6 @@ name: Build binaries
 # The build recipes mirror deployment.yml, so the artifacts here are the same
 # thing the release workflow would upload: fully static on Linux, and on macOS
 # linked against static libgc/libpcre2 so the binary does not need Homebrew.
-#
-# Note: artifacts are delivered as zips and GitHub does not preserve the
-# executable bit, so `chmod +x tmux-fingers` after unzipping.
 
 on:
   workflow_dispatch:
